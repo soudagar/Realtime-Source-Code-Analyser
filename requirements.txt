@@ -1,0 +1,9 @@
+openai
+tiktoken
+chromadb
+langchain
+flask
+python-dotenv
+gitpython
+numpy
+-e .
