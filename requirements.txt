@@ -2,6 +2,11 @@ openai
 tiktoken
 chromadb
 langchain
+langchain-community
+langchain-text-splitters
+langchain-huggingface
+sentence-transformers
+langchain-chroma
 flask
 python-dotenv
 gitpython
