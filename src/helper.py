@@ -21,18 +21,45 @@ def clone_repo(repo_url: str):
     return repo_path
 
 def load_repo_docs(repo_path: str):
-    loader = GenericLoader.from_filesystem(repo_path,
-                                       glob="**/*",
-                                       suffixes=[".py"],
-                                       parser = LanguageParser(language="python", parser_threshold=500)
-                                       )
-    documents = loader.load()
+    documents = []
+    language_map = {
+        ".py": Language.PYTHON,
+        ".js": Language.JS,
+        ".ts": Language.TS,
+        ".jsx": Language.JS,
+        ".tsx": Language.TS
+    }
+    
+    for ext, lang in language_map.items():
+        try:
+            loader = GenericLoader.from_filesystem(
+                repo_path,
+                glob=f"**/*{ext}", 
+                suffixes=[ext],
+                parser=LanguageParser(language=lang, parser_threshold=500)
+            )
+            documents.extend(loader.load())
+        except Exception as e:
+            print(f"Error loading {ext} files: {e}")
+            
     return documents
 
 def split_docs(documents):
-    text_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.PYTHON, chunk_size=2000, chunk_overlap=200)
-    text_chunk = text_splitter.split_documents(documents)  
-    return text_chunk
+    splitters = {}
+    text_chunks = []
+    
+    for doc in documents:
+        lang_str = doc.metadata.get("language")
+        if lang_str not in splitters:
+            try:
+                lang_enum = Language(lang_str)
+                splitters[lang_str] = RecursiveCharacterTextSplitter.from_language(language=lang_enum, chunk_size=2000, chunk_overlap=200)
+            except (ValueError, TypeError):
+                splitters[lang_str] = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+                
+        text_chunks.extend(splitters[lang_str].split_documents([doc]))
+        
+    return text_chunks
 
 def load_embeddings():
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")

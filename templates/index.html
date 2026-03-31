@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Source Code Analyser</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script> <!-- For markdown rendering -->
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-panel">
+            <div class="logo-area">
+                <i class="fa-solid fa-code fa-2x logo-icon"></i>
+                <h2>Code Analyser</h2>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Connect Repository</h3>
+                <form id="repoForm" class="repo-form" style="display:flex; flex-direction:column; gap:0.5rem;">
+                    <input type="url" id="repoUrl" placeholder="https://github.com/..." required style="padding:0.5rem; border-radius:4px; border:1px solid var(--border-color); background:rgba(0,0,0,0.2); color:white;">
+                    <button type="submit" style="padding:0.5rem; border-radius:4px; background:var(--primary-color); border:none; color:white; cursor:pointer; font-weight:500;">Analyze Repo</button>
+                    <small id="repoStatus" style="color:var(--text-muted); font-size:0.8rem;"></small>
+                </form>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3>About</h3>
+                <p class="description">
+                    Powered by RAG & LangChain. Ask questions about your source code.
+                </p>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Architecture</h3>
+                <ul class="tech-stack">
+                    <li><i class="fa-solid fa-microchip"></i> Llama 3.2</li>
+                    <li><i class="fa-solid fa-brain"></i> HuggingFace Embeddings</li>
+                    <li><i class="fa-solid fa-database"></i> Chroma Vector Store</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+            <header class="chat-header glass-panel">
+                <div class="header-info">
+                    <h1>Realtime Source Code Analyser</h1>
+                    <span class="status"><i class="fa-solid fa-circle"></i> System Online</span>
+                </div>
+                <button class="icon-btn" id="clearBtn" title="Clear Chat"><i class="fa-solid fa-trash-can"></i></button>
+            </header>
+
+            <div class="chat-history" id="chatHistory">
+                <!-- Initial Bot Message -->
+                <div class="message bot-message">
+                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="bubble">
+                        <p>Hello! I am your source code analyser. I've ingested the repository into the vector store. How can I help you understand the code today?</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-area glass-panel">
+                <form id="chatForm" class="input-form">
+                    <input type="text" id="userInput" placeholder="Ask a question about the codebase..." required autocomplete="off">
+                    <button type="submit" id="sendBtn"><i class="fa-solid fa-paper-plane"></i></button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Configure marked to sanitize HTML
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+
+            function scrollToBottom() {
+                var chatHistory = $('#chatHistory');
+                chatHistory.scrollTop(chatHistory[0].scrollHeight);
+            }
+
+            function addMessage(sender, text) {
+                const isUser = sender === 'user';
+                const avatarIcon = isUser ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
+                const messageClass = isUser ? 'user-message' : 'bot-message';
+                
+                // If it's the bot, render markdown
+                const content = isUser ? text : marked.parse(text);
+
+                const messageHtml = `
+                    <div class="message ${messageClass} fade-in">
+                        <div class="avatar">${avatarIcon}</div>
+                        <div class="bubble">
+                            ${content}
+                        </div>
+                    </div>
+                `;
+                $('#chatHistory').append(messageHtml);
+                scrollToBottom();
+            }
+
+            function showTyping() {
+                const typingHtml = `
+                    <div class="message bot-message typing-indicator fade-in" id="typingIndicator">
+                        <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                        <div class="bubble">
+                            <div class="dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                $('#chatHistory').append(typingHtml);
+                scrollToBottom();
+            }
+
+            function hideTyping() {
+                $('#typingIndicator').remove();
+            }
+
+            $('#repoForm').on('submit', function(e) {
+                e.preventDefault();
+                const text = $('#repoUrl').val().trim();
+                if (!text) return;
+
+                $('#repoStatus').text('Cloning and analyzing repo... please wait.').css('color', 'var(--text-muted)');
+                $('#repoForm button').prop('disabled', true).text('Analyzing...');
+
+                $.ajax({
+                    type: "POST",
+                    url: "/chat",
+                    data: { question: text },
+                    success: function(res) {
+                        $('#repoForm button').prop('disabled', false).text('Analyze Repo');
+                        if(res && res.response) {
+                            $('#repoStatus').text(res.response).css('color', '#10b981');
+                        } else {
+                            $('#repoStatus').text('Success!').css('color', '#10b981');
+                        }
+                    },
+                    error: function() {
+                        $('#repoForm button').prop('disabled', false).text('Analyze Repo');
+                        $('#repoStatus').text('Error connecting to server.').css('color', '#ef4444');
+                    }
+                });
+            });
+
+            $('#chatForm').on('submit', function(e) {
+                e.preventDefault();
+                const text = $('#userInput').val().trim();
+                if (!text) return;
+
+                addMessage('user', text);
+                $('#userInput').val('');
+                showTyping();
+
+                // Send to backend
+                $.ajax({
+                    type: "POST",
+                    url: "/get",
+                    data: { question: text },
+                    success: function(res) {
+                        hideTyping();
+                        if(res && res.response) {
+                            addMessage('bot', res.response);
+                        } else {
+                            addMessage('bot', "Sorry, I received an empty response. Make sure the backend route `/get` returns JSON with a `response` key.");
+                        }
+                    },
+                    error: function() {
+                        hideTyping();
+                        addMessage('bot', "An error occurred connecting to the server. Please verify the `app.py` has a `/get` endpoint set up.");
+                    }
+                });
+            });
+
+            $('#clearBtn').click(function() {
+                $('#chatHistory').html(`
+                    <div class="message bot-message fade-in">
+                        <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                        <div class="bubble">
+                            <p>Chat cleared! Let me know if you have more questions.</p>
+                        </div>
+                    </div>
+                `);
+            });
+        });
+    </script>
+</body>
+</html>
