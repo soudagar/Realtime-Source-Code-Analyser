@@ -10,5 +10,5 @@ flask
 pydantic
 pydantic-settings
 python-dotenv
-gitpython
+dulwich
 numpy

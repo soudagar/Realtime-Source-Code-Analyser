@@ -1,4 +1,4 @@
-from git import Repo
+from dulwich import porcelain as git_porcelain
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
@@ -15,7 +15,9 @@ def clone_repo(repo_url: str):
     # Remove stale clone if present so we always get a fresh copy
     if os.path.exists(repo_path):
         shutil.rmtree(repo_path)
-    Repo.clone_from(repo_url, repo_path)
+    os.makedirs(repo_path, exist_ok=True)
+    # dulwich is a pure-Python git impl — no system git binary needed (works on Vercel)
+    git_porcelain.clone(repo_url, repo_path)
     return repo_path
 
 
