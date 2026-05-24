@@ -1,0 +1,10 @@
+venv/
+.venv/
+vector_store/
+repo/
+*.egg-info/
+__pycache__/
+.env
+research/
+*.pyc
+*.pyo

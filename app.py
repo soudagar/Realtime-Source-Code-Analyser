@@ -1,39 +1,61 @@
 # Model and Embeddings integrations
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.chat_models import ChatOllama
-from pydantic import BaseModel, HttpUrl, ValidationError
-# Chroma has its own dedicated community package now
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
-# Memory and Chains components remain in the core langchain package
+# Memory and Chains components remain in the langchain-classic package
 from langchain_classic.memory import ConversationSummaryMemory
 from langchain_classic.chains import ConversationalRetrievalChain
-from src.helper import clone_repo, load_embeddings
+from src.helper import load_embeddings, build_vector_store
+from src.config import settings
+from pydantic import BaseModel, ValidationError
 from flask import Flask, request, jsonify, render_template
 import os
+import shutil
 
 app = Flask(__name__)
-    
-embedding = load_embeddings()
-vector_db = Chroma(persist_directory='./vector_store', embedding_function=embedding)
 
-llm = ChatOllama(model="llama3.2:latest")
-memory = ConversationSummaryMemory(llm=llm, memory_key="chat_history", return_messages=True)
+# ---------------------------------------------------------------------------
+# Global state — shared across warm lambda invocations on Vercel
+# ---------------------------------------------------------------------------
+vector_db = None
+qa = None
 
-qa = ConversationalRetrievalChain.from_llm(llm, retriever=vector_db.as_retriever(search_type="mmr", search_kwargs={"k":8}),memory=memory)
 
+def _init_qa(vdb: Chroma):
+    """Build the conversational QA chain from a given vector store."""
+    llm = ChatOpenAI(
+        model=settings.MODEL_NAME,
+        openai_api_key=settings.OPENAI_API_KEY,
+        temperature=0.2,
+    )
+    memory = ConversationSummaryMemory(
+        llm=llm, memory_key="chat_history", return_messages=True
+    )
+    return ConversationalRetrievalChain.from_llm(
+        llm,
+        retriever=vdb.as_retriever(search_type="mmr", search_kwargs={"k": 8}),
+        memory=memory,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pydantic request / response models
+# ---------------------------------------------------------------------------
 class RepoRequest(BaseModel):
-    question: str
-    
+    question: str  # re-uses existing field name (holds repo URL)
+
+
 class ChatRequest(BaseModel):
-    question:str
-    
+    question: str
+
+
 class ChatResponse(BaseModel):
     response: str
-    success: bool= True
-    
+    success: bool = True
 
 
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
 @app.route("/", methods=["GET", "POST"])
 def index():
     return render_template("index.html")
@@ -41,32 +63,55 @@ def index():
 
 @app.route("/chat", methods=["GET", "POST"])
 def gitRepo():
+    global vector_db, qa
     try:
         if request.method == "POST":
             data = RepoRequest(question=request.form["question"])
-            clone_repo(str(data.question))
-            os.system("python store_index.py")
-            return jsonify({"response": f"Repo {data.question} cloned successfully"})
+            repo_url = str(data.question)
+
+            # Build vector store inline (no subprocess needed)
+            vector_db = build_vector_store(repo_url)
+            qa = _init_qa(vector_db)
+
+            return jsonify({"response": f"Repo {repo_url} cloned and indexed successfully."})
+
+        return jsonify({"error": "POST a repo URL via the 'question' field."}), 400
+
     except ValidationError as e:
         return jsonify({"error": str(e)}), 400
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 422
+    except Exception as e:
+        return jsonify({"error": f"Failed to index repository: {e}"}), 500
+
 
 @app.route("/get", methods=["GET", "POST"])
 def chat():
-    msg = request.form["question"]
-    input = msg
-    print(input)
-    
-    if input == 'clear':
-        os.system("rm -rf repo")
-        ## os.system("rm -rf vector_store")
+    global qa
+    try:
+        msg = request.form["question"]
 
-    result = qa({"question": input})
-    response = ChatResponse(response = result["answer"])
-    print(result["answer"])
-    return jsonify(response.model_dump()) 
+        if msg.strip().lower() == "clear":
+            # Clean up cloned repo; vector store stays until next /chat call
+            repo_path = settings.REPO_PATH
+            if os.path.exists(repo_path):
+                shutil.rmtree(repo_path)
+            return jsonify({"response": "Repository cleared.", "success": True})
+
+        if qa is None:
+            return jsonify({
+                "response": "No repository indexed yet. Please submit a GitHub URL first.",
+                "success": False,
+            })
+
+        result = qa({"question": msg})
+        response = ChatResponse(response=result["answer"])
+        print(result["answer"])
+        return jsonify(response.model_dump())
+
+    except Exception as e:
+        return jsonify({"response": f"Error: {e}", "success": False}), 500
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
