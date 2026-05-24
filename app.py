@@ -2,6 +2,7 @@
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.chat_models import ChatOllama
+from pydantic import BaseModel, HttpUrl, ValidationError
 # Chroma has its own dedicated community package now
 from langchain_chroma import Chroma
 # Memory and Chains components remain in the core langchain package
@@ -21,6 +22,18 @@ memory = ConversationSummaryMemory(llm=llm, memory_key="chat_history", return_me
 
 qa = ConversationalRetrievalChain.from_llm(llm, retriever=vector_db.as_retriever(search_type="mmr", search_kwargs={"k":8}),memory=memory)
 
+class RepoRequest(BaseModel):
+    question: str
+    
+class ChatRequest(BaseModel):
+    question:str
+    
+class ChatResponse(BaseModel):
+    response: str
+    success: bool= True
+    
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     return render_template("index.html")
@@ -28,11 +41,14 @@ def index():
 
 @app.route("/chat", methods=["GET", "POST"])
 def gitRepo():
-    if request.method == "POST":
-        user_msg = request.form["question"]
-        clone_repo(user_msg)
-        os.system("python store_index.py")
-    return jsonify({"response": f"Repo {user_msg} cloned successfully"})
+    try:
+        if request.method == "POST":
+            data = RepoRequest(question=request.form["question"])
+            clone_repo(str(data.question))
+            os.system("python store_index.py")
+            return jsonify({"response": f"Repo {data.question} cloned successfully"})
+    except ValidationError as e:
+        return jsonify({"error": str(e)}), 400
 
 @app.route("/get", methods=["GET", "POST"])
 def chat():
@@ -45,8 +61,9 @@ def chat():
         ## os.system("rm -rf vector_store")
 
     result = qa({"question": input})
+    response = ChatResponse(response = result["answer"])
     print(result["answer"])
-    return jsonify({"response": result["answer"]}) 
+    return jsonify(response.model_dump()) 
 
 
 

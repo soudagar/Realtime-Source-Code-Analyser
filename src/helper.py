@@ -12,6 +12,7 @@ from langchain_chroma import Chroma
 # Memory and Chains components remain in the core langchain package
 from langchain_classic.memory import ConversationSummaryMemory
 from langchain_classic.chains import ConversationalRetrievalChain
+from src.config import settings
 import os
 
 def clone_repo(repo_url: str):
@@ -62,5 +63,5 @@ def split_docs(documents):
     return text_chunks
 
 def load_embeddings():
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
     return embeddings

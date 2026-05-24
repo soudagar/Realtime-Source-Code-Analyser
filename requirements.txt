@@ -1,4 +1,3 @@
-openai
 tiktoken
 chromadb
 langchain
@@ -8,6 +7,8 @@ langchain-huggingface
 sentence-transformers
 langchain-chroma
 flask
+pydantic
+pydantic-settings
 python-dotenv
 gitpython
 numpy
