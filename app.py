@@ -82,7 +82,12 @@ def gitRepo():
     except ValueError as e:
         return jsonify({"error": str(e)}), 422
     except Exception as e:
-        return jsonify({"error": f"Failed to index repository: {e}"}), 500
+        error_msg = str(e)
+        if "No valid credentials provided" in error_msg or "unauthorized" in error_msg.lower():
+            return jsonify({
+                "error": "Failed to index repository: The repository appears to be private or requires authentication. Only public repositories can be analyzed."
+            }), 400
+        return jsonify({"error": f"Failed to index repository: {error_msg}"}), 500
 
 
 @app.route("/get", methods=["GET", "POST"])

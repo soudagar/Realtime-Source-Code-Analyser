@@ -71,6 +71,7 @@ def load_embeddings():
     """Return HuggingFace Inference API embeddings — lightweight, no PyTorch required."""
     return HuggingFaceInferenceAPIEmbeddings(
         model_name=settings.EMBEDDING_MODEL,
+        api_key=settings.HF_TOKEN,
     )
 
 

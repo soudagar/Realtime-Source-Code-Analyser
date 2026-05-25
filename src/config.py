@@ -4,6 +4,7 @@ import os
 
 class AppSettings(BaseSettings):
     GROK_API_KEY: str
+    HF_TOKEN: str = ""
     MODEL_NAME: str = "llama-3.3-70b-versatile"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     # Use /tmp on Vercel (ephemeral but writable); falls back to local for dev
