@@ -1,5 +1,5 @@
 # Model and Embeddings integrations
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_groq import ChatGroq
 from langchain_chroma import Chroma
 # Memory and Chains components remain in the langchain-classic package
 from langchain_classic.memory import ConversationSummaryMemory
@@ -22,9 +22,9 @@ qa = None
 
 def _init_qa(vdb: Chroma):
     """Build the conversational QA chain from a given vector store."""
-    llm = ChatOpenAI(
+    llm = ChatGroq(
         model=settings.MODEL_NAME,
-        openai_api_key=settings.OPENAI_API_KEY,
+        groq_api_key=settings.GROK_API_KEY,
         temperature=0.2,
     )
     memory = ConversationSummaryMemory(

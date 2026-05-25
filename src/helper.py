@@ -2,8 +2,8 @@ from dulwich import porcelain as git_porcelain
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
-# Use OpenAI embeddings — no torch/sentence-transformers needed (Vercel-safe)
-from langchain_openai import OpenAIEmbeddings
+# Use HuggingFace Inference API embeddings — no torch/sentence-transformers needed (Vercel-safe)
+from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_chroma import Chroma
 from src.config import settings
 import os
@@ -68,10 +68,9 @@ def split_docs(documents):
 
 
 def load_embeddings():
-    """Return OpenAI embeddings — lightweight, no PyTorch required."""
-    return OpenAIEmbeddings(
-        model=settings.EMBEDDING_MODEL,
-        openai_api_key=settings.OPENAI_API_KEY,
+    """Return HuggingFace Inference API embeddings — lightweight, no PyTorch required."""
+    return HuggingFaceInferenceAPIEmbeddings(
+        model_name=settings.EMBEDDING_MODEL,
     )
 
 

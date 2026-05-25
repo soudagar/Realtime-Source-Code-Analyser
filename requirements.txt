@@ -3,7 +3,8 @@ chromadb
 langchain
 langchain-community
 langchain-text-splitters
-langchain-openai
+langchain-groq
+huggingface_hub
 langchain-chroma
 langchain-classic
 flask
